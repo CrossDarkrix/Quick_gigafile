@@ -6,19 +6,22 @@ from selenium import webdriver
 from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.common.by import By
 from selenium.webdriver.edge.options import Options
-
 options = Options()
 options.add_argument("--headless")
+options.add_argument("--log-level=3")
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+options.set_capability('acceptInsecureCerts', True)
+
 def upload_file_and_get_link(file_path:str, password=None):
         try:
             service = webdriver.EdgeService(service_args=['--log-level=OFF'], log_output=None)
             driver = webdriver.Edge(options=options, service=service)
             print("ページを読み込んでいます")
             driver.get("https://gigafile.nu/")
-            print(file_path)
             upload_panel = driver.find_element(By.ID, 'upload_panel_button')
             file_input = upload_panel.find_element(By.XPATH, ".//input[@type='file']")
-            file_input.send_keys(file_path.rstrip('\n'))
+            print(file_input.text)
+            file_input.send_keys(file_path)
             time.sleep(1)
             print("アップロードしています")
             while True:
@@ -46,7 +49,9 @@ def upload_file_and_get_link(file_path:str, password=None):
             link_element = driver.find_element(By.XPATH, "//a[@id='matomete_link_btn']")
             link = link_element.get_attribute("href")
             print("成功")
-            print("クリップボードにコピーされました")
+            print("クリップボードにコピーされました!")
+            with open(os.path.join(os.path.dirname(file_path), 'upload_config.conf'), 'w', encoding='utf-8') as configfile:
+                configfile.write('[{}]\nPassword: {}'.format(link, password))
             return '{}'.format(link)
         except:
             print("失敗")
@@ -56,23 +61,24 @@ def main():
     Ap = argparse.ArgumentParser()
     Ap.add_argument("PATH", nargs='?', help="ファイルパスを入力")
     Ap.add_argument("-nP", "--none-password", help="パスワードが不要な場合に使用")
+    Ap.add_argument("-c", "--configfile", nargs='?', help="設定ファイルを読み込むときに使用")
     Arguments = Ap.parse_args()
-    file_paths = ""
     # 各引数について確認します。
     if Arguments.none_password:
         password = None
         PATHs = Arguments.none_password
+    elif Arguments.configfile:
+        config_file = open(Arguments.configfile, 'r', encoding='utf-8').read()
+        PATHs = Arguments.PATH
+        password = config_file.split('\nPassword: ')[1]
     elif Arguments.PATH:
         password = input("パスワード>> ")
         PATHs = Arguments.PATH
     if os.path.isdir(PATHs):
         print(f"{PATHs} is a directory. Exiting.")
-    elif os.path.isfile(PATHs):
-        file_paths += PATHs + "\n"
-    else:
-        print(f"{PATHs} does not exist. Exiting.")
-    pyperclip.copy(upload_file_and_get_link(file_paths, password=password))
+    if not '\\' or not '/' in PATHs:
+        PATHs = os.path.join(os.getcwd(), PATHs)
+    pyperclip.copy(upload_file_and_get_link(PATHs, password=password))
 
 if __name__ == '__main__':
     main()
-
